@@ -19,7 +19,20 @@ e ::= n
 
 type variable = string ;;
 
-type operator = Sum | Diff | Mult | Div | Eq | Neq | Less| Leq | Greater | Geq | And | Or | Not;;
+type operator = 
+    Sum 
+  | Diff 
+  | Mult 
+  | Div 
+  | Eq 
+  | Neq 
+  | Less
+  | Leq 
+  | Greater 
+  | Geq 
+  | And 
+  | Or 
+  | Not;;
 
 (*
   Aqui são definidos os tipos básicos:
@@ -59,22 +72,97 @@ type value = Vnum of int
            | Vnil
            | Vcons of value * value
            | Vraise
+           | VClosure of variable * variable * expr * env
+           | VRecClosure of variable * variable * expr * env
+          
 and  
-    (* aqui o ambiente é definido como sendo uma lista de variaveis amarradas a um valor *)
     env = (variable * value) list ;; 
 
 
-(* ENV CONTROLL *)
+(* GERÊNCIA DE AMBIENTE *)
+(*-------------------------------------------------------------------------------*)
 
+(* Função auxiliar para remover tuplas de uma lista*)
+let remove_tuple var list =
+  List.filter (fun (k, _) -> k <> var) list 
+  ;;
 
 (* ambiente vazio *)
 let empty_env : env = [] ;;
 
-let remove_env_binding var list = List.filter(fun (k,_) -> k <> var) list ;;
-   
-(* Temos que levar, sempre, em consideração o ambiente onde cada aplicação está acontecendo e coletar as constraints*)
+(* Função para  remover a amarração de uma variável em um dado ambiente *)
+let remove_env_binding var list = 
+  List.filter(fun (k,_) -> k <> var) list ;;
 
+(* Função que adiciona amarraçao  *)
+let add_env_biding var v e : env = match e with
+  | [] -> [(var,v)]
+  | hd::tl -> 
+    if (List.exists (fun (k, _) -> k = var) e) 
+    then List.append (remove_tuple var e) [(var,v)]
+    else List.append e [(var,v)]
+    ;;
+
+(* Função que retorna o valor de uma variável em um dado ambiente  *)
+let rec look_env_biding var e : env = match e with
+    [] -> raise Not_found
+  | (v, value)::tl ->
+      if (v == var) then value else look_env_biding var tl
+
+(*-------------------------------------------------------------------------------*)
+
+
+(* Temos que levar, sempre, em consideração o ambiente onde cada aplicação está acontecendo e coletar as constraints*)
 (* --------------- Avaliador Big-Step de Programas L1 --------------- *)
+
+let rec eval (environment : env) (e : expr) : value = 
+  match e with
+  (* valores *)
+  | Num(n) -> Vnum(n)
+  | Bool(b) -> Vbool(b)
+  
+  (*operações *)
+  | Bop (e1,op,e2) -> 
+    let n1 = eval environment e1 in
+    let n2 = eval environment e2 in
+    (match n1, op, n2 with
+      | VNum(n1), Sum, VNum(n2) -> VNum(n1+n2)
+      | VNum(n1), Diff, VNum(n2) -> VNum(n1-n2)
+      | VNum(n1), Mult, VNum(n2) -> VNum(n1*n2)
+      | VNum(n1), Div, VNum(n2) -> 
+          (match n2 with
+            | Num(0) -> Vraise
+            | _ -> VNum(n1/n2))
+      | VNum(n1), Eq, VNum(n2) -> Vbool(n1=n2)
+      | VNum(n1), Neq, VNum(n2) -> Vbool(n1<>n2)
+      | VNum(n1), Less, VNum(n2) -> Vbool(n1<n2)
+      | VNum(n1), Leq, VNum(n2) -> Vbool(n1<=n2)
+      | VNum(n1), Greater, VNum(n2) -> Vbool(n1>n2)
+      | VNum(n1), Geg, VNum(n2) -> Vbool(n1>=n2)
+      | Vbool(n1), And, Vbool(n2) -> Vbool(n1&&n2)
+      | Vbool(n1), Or, Vbool(n2) -> Vbool(n1||n2)
+      | _ -> failwith "unimplemented")
+  (* ifs *)
+  | If (e1,e2,e3) ->
+    let b1 = eval environment e1 in
+    (match b1 with
+      | Vbool(true) -> eval environment e2
+      | Vbool(false) -> eval environment e3
+      | _ -> Vraise )
+  (* variáveis  *)
+  | Var(variable) ->
+    look_env_biding variable environment
+  (* aplicações *)
+  | App (e1,e2) -> 
+    let v1 = eval environment e1 in 
+    let v2 = eval environment e2 in
+    (match v1,v2 with
+      (*atualiza o ambiente para adicionar a amarração*)
+      VClosure(var, e, envi), v -> eval (add_env_biding var v envi) e)
+  | _ -> failwith "unimplemented"
+
+;;
+  
 
 
 
@@ -89,8 +177,6 @@ let remove_env_binding var list = List.filter(fun (k,_) -> k <> var) list ;;
 
 
 (* typeInfer *)
-
-
 
 
 
