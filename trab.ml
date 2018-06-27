@@ -13,7 +13,7 @@ e ::= n
   | isempty e
   | hd e
   | tl e
-  | raise
+  | Vraise 
   | try e1 with e2 
 *)
 
@@ -58,7 +58,7 @@ type expr = Num of int
           | IsEmpty of expr
           | Hd of expr
           | Tl of expr
-          | Raise
+          | Raise 
           | TryWith of expr * expr
           | LamImpl of variable * expr 
           | LetImpl of variable * expr * expr
@@ -71,7 +71,7 @@ type value = Vnum of int
            | Vrclos of variable * variable * expr * env (*AQUI: a meisma coisa*)
            | Vnil
            | Vcons of value * value
-           | Raise     
+           | Vraise      
 and  
     env = (variable * value) list ;; 
 
@@ -98,7 +98,7 @@ let add_env_biding var v e : env = match e with
 
 (* Função que retorna o valor de uma variável em um dado ambiente  *)
 let rec look_env_biding var e : value = match e with
-    [] -> raise Not_found
+    [] -> raise  Not_found
   | (v, value)::tl ->
       if (v == var) then value else look_env_biding var tl
 
@@ -124,7 +124,7 @@ let rec eval (environment : env) (e : expr) : value =
       | Vnum(n1), Diff, Vnum(n2) -> Vnum(n1-n2)
       | Vnum(n1), Mult, Vnum(n2) -> Vnum(n1*n2)
       | Vnum(n1), Div, Vnum(n2) -> 
-          if n2 == 0 then Raise else Vnum(n1/n2)
+          if n2 == 0 then Vraise  else Vnum(n1/n2)
       | Vnum(n1), Eq, Vnum(n2) -> Vbool(n1=n2)
       | Vnum(n1), Neq, Vnum(n2) -> Vbool(n1<>n2)
       | Vnum(n1), Less, Vnum(n2) -> Vbool(n1<n2)
@@ -141,7 +141,7 @@ let rec eval (environment : env) (e : expr) : value =
     (match b1 with
       | Vbool(true) -> eval environment e2
       | Vbool(false) -> eval environment e3
-      | _ -> Raise )
+      | _ -> Vraise  )
  
   (* variáveis  *)
   | Var(variable) ->
@@ -188,8 +188,8 @@ let rec eval (environment : env) (e : expr) : value =
     let v1 = eval environment e1 in 
     let v2 = eval environment e2 in 
     (match v1, v2 with
-      | (Raise,_) -> Raise
-      | (_, Raise) -> Raise
+      | (Vraise ,_) -> Vraise 
+      | (_, Vraise ) -> Vraise 
       | _ -> Vcons(v1, v2)
     ) 
    )
@@ -200,8 +200,8 @@ let rec eval (environment : env) (e : expr) : value =
     (match v with 
       |Vnil -> (Vbool true)
       |Vcons (v1, v2) -> (Vbool false)
-      |Raise -> Raise
-      | _ -> Raise 
+      |Vraise  -> Vraise 
+      | _ -> Vraise  
     )
 
   (* head *)
@@ -209,9 +209,9 @@ let rec eval (environment : env) (e : expr) : value =
     let v = eval environment e in
     (match v with
       | Vcons(v1,v2) -> v1
-      | Vnil -> Raise
-      | Raise -> Raise
-      | _ -> Raise
+      | Vnil -> Vraise  
+      | Vraise  -> Vraise  
+      | _ -> Vraise 
     )
   
   (* tail *)
@@ -219,19 +219,19 @@ let rec eval (environment : env) (e : expr) : value =
     let v = eval environment e in 
     (match v with
       | Vcons(v1,v2) -> v2
-      | Vnil -> Raise
-      | Raise -> Raise
-      | _ -> Raise
+      | Vnil -> Vraise 
+      | Vraise  -> Vraise 
+      | _ -> Vraise 
     )
 
-  (* raise *)
-  | Raise -> Raise
+  (* Vraise  *)
+  | Raise  -> Vraise 
 
   (* try with *)
   | TryWith(e1, e2) ->
     let v = eval environment e1 in 
     (match v with
-      |Raise -> eval environment e2
+      |Vraise  -> eval environment e2
       | _ -> v
     )
 
