@@ -242,7 +242,7 @@ let funcPass = Function("x",BinOp(Var("x"),Sum,Num(1)));;
 
 let varX = Var("x");;
 let applicPass = Applic(Function("x", BinOp(varX,Sum,Num(1))),Num(1));;
-let applicFail = Applic(Var("x"),Num(1));
+let applicFail = Applic(Var("x"),Num(1));;
 
 
 (* let *)

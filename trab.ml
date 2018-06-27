@@ -51,8 +51,8 @@ type expr = Num of int
           | Var of variable 
           | App of expr * expr 
           | Lam of variable * tipo * expr 
-          | Let of variable * tipo * expr * expr
-          | Lrec of variable * tipo * tipo * variable * tipo * expr * expr
+          | Let of variable * expr * expr
+          | Lrec of variable * tipo * expr
           | Nil
           | Cons of expr * expr
           | IsEmpty of expr
@@ -72,7 +72,7 @@ type value = Vnum of int
            | Vnil
            | Vcons of value * value
            | Vraise
-           | VClosure of variable * variable * expr * env
+           | VClosure of variable * expr * env
            | VRecClosure of variable * variable * expr * env
           
 and  
@@ -85,10 +85,9 @@ and
 (* Função auxiliar para remover tuplas de uma lista*)
 let remove_tuple var list =
   List.filter (fun (k, _) -> k <> var) list 
-  ;;
 
 (* ambiente vazio *)
-let empty_env : env = [] ;;
+let empty_env : env = []
 
 (* Função para  remover a amarração de uma variável em um dado ambiente *)
 let remove_env_binding var list = 
@@ -101,7 +100,7 @@ let add_env_biding var v e : env = match e with
     if (List.exists (fun (k, _) -> k = var) e) 
     then List.append (remove_tuple var e) [(var,v)]
     else List.append e [(var,v)]
-    ;;
+  
 
 (* Função que retorna o valor de uma variável em um dado ambiente  *)
 let rec look_env_biding var e : value = match e with
@@ -112,7 +111,8 @@ let rec look_env_biding var e : value = match e with
 (*-------------------------------------------------------------------------------*)
 
 
-(* Temos que levar, sempre, em consideração o ambiente onde cada aplicação está acontecendo e coletar as constraints*)
+(* Temos que levar, sempre, em consideração o ambiente onde cada aplicação está 
+acontecendo e coletar as constraints*)
 (* --------------- Avaliador Big-Step de Programas L1 --------------- *)
 
 let rec eval (environment : env) (e : expr) : value = 
@@ -151,13 +151,30 @@ let rec eval (environment : env) (e : expr) : value =
   | Var(variable) ->
     look_env_biding variable environment
   (* aplicações *)
-  (* | App (e1,e2) -> 
+  | App (e1,e2) -> 
     let v1 = eval environment e1 in 
     let v2 = eval environment e2 in
     (match v1,v2 with
       (*atualiza o ambiente para adicionar a amarração*)
-      VClosure(var, e, envi), v -> eval (add_env_biding var v envi) e)
-      VRecClosure(var, e, envi), v -> eval (add_env_biding var v envi) e) *)
+      | VClosure(var, e, envi), v -> eval (add_env_biding var v envi) e
+      | VRecClosure(f, x, e, envi), v -> 
+          eval (add_env_biding f (VRecClosure (f, x, e, envi)) (add_env_biding x v envi)) e
+      | _ -> failwith "unimplemented")
+  (* let *)
+  | Let(var,e1,e2) ->
+    let v1 = eval environment e1 in
+    (
+      eval (add_env_biding var v1 environment) e2
+    )
+
+  (* letrec *)
+  (* | Lrec (f, e1, e2) ->
+    let v1 = eval environment e2 in
+    (
+      match v1 with
+        |  VClosure(x,e,envi) -> eval (add_env_biding f (VRecClosure (f,x,e,environment)) envi) e2
+        | _ -> failwith "unimplemented"
+    )  *)
   | _ -> failwith "unimplemented"
 
 ;;
@@ -198,8 +215,14 @@ App(Var("fat"), Num(5))) *)
 
 
 (*testes*)
+(* let sumPass = BinOp(Num(1), Sum, Num(1));;
 
-let sumPass = BinOp(Vnum(1), Sum, Vnum(1));;
-let result_eval_sum = eval sumPass environment
+eval environment sumPass ;; *)
+
+
+let environment = empty_env;;
+let a = Num(5) ;;
+
+
 
 (* #use "trab.ml";; *)
