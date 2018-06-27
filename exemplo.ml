@@ -55,7 +55,8 @@
 	    environment = (variable * value) list;;
 
 
-
+(* GERÊNCIA DE AMBIENTE *)
+(*-------------------------------------------------------------------------------*)
 (* função auxiliar para remover tupla de lista: *)
 let remove_tuple var list =
 	List.filter (fun (k, _) -> k <> var) list 

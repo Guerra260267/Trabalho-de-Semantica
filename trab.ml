@@ -104,7 +104,7 @@ let add_env_biding var v e : env = match e with
     ;;
 
 (* Função que retorna o valor de uma variável em um dado ambiente  *)
-let rec look_env_biding var e : env = match e with
+let rec look_env_biding var e : value = match e with
     [] -> raise Not_found
   | (v, value)::tl ->
       if (v == var) then value else look_env_biding var tl
@@ -122,23 +122,21 @@ let rec eval (environment : env) (e : expr) : value =
   | Bool(b) -> Vbool(b)
   
   (*operações *)
-  | Bop (e1,op,e2) -> 
+  | Bop (op,e1,e2) -> 
     let n1 = eval environment e1 in
     let n2 = eval environment e2 in
     (match n1, op, n2 with
-      | VNum(n1), Sum, VNum(n2) -> VNum(n1+n2)
-      | VNum(n1), Diff, VNum(n2) -> VNum(n1-n2)
-      | VNum(n1), Mult, VNum(n2) -> VNum(n1*n2)
-      | VNum(n1), Div, VNum(n2) -> 
-          (match n2 with
-            | Num(0) -> Vraise
-            | _ -> VNum(n1/n2))
-      | VNum(n1), Eq, VNum(n2) -> Vbool(n1=n2)
-      | VNum(n1), Neq, VNum(n2) -> Vbool(n1<>n2)
-      | VNum(n1), Less, VNum(n2) -> Vbool(n1<n2)
-      | VNum(n1), Leq, VNum(n2) -> Vbool(n1<=n2)
-      | VNum(n1), Greater, VNum(n2) -> Vbool(n1>n2)
-      | VNum(n1), Geg, VNum(n2) -> Vbool(n1>=n2)
+      | Vnum(n1), Sum, Vnum(n2) -> Vnum(n1+n2)
+      | Vnum(n1), Diff, Vnum(n2) -> Vnum(n1-n2)
+      | Vnum(n1), Mult, Vnum(n2) -> Vnum(n1*n2)
+      | Vnum(n1), Div, Vnum(n2) -> 
+          if n2 == 0 then Vraise else Vnum(n1/n2)
+      | Vnum(n1), Eq, Vnum(n2) -> Vbool(n1=n2)
+      | Vnum(n1), Neq, Vnum(n2) -> Vbool(n1<>n2)
+      | Vnum(n1), Less, Vnum(n2) -> Vbool(n1<n2)
+      | Vnum(n1), Leq, Vnum(n2) -> Vbool(n1<=n2)
+      | Vnum(n1), Greater, Vnum(n2) -> Vbool(n1>n2)
+      | Vnum(n1), Geq, Vnum(n2) -> Vbool(n1>=n2)
       | Vbool(n1), And, Vbool(n2) -> Vbool(n1&&n2)
       | Vbool(n1), Or, Vbool(n2) -> Vbool(n1||n2)
       | _ -> failwith "unimplemented")
@@ -153,12 +151,13 @@ let rec eval (environment : env) (e : expr) : value =
   | Var(variable) ->
     look_env_biding variable environment
   (* aplicações *)
-  | App (e1,e2) -> 
+  (* | App (e1,e2) -> 
     let v1 = eval environment e1 in 
     let v2 = eval environment e2 in
     (match v1,v2 with
       (*atualiza o ambiente para adicionar a amarração*)
       VClosure(var, e, envi), v -> eval (add_env_biding var v envi) e)
+      VRecClosure(var, e, envi), v -> eval (add_env_biding var v envi) e) *)
   | _ -> failwith "unimplemented"
 
 ;;
@@ -195,5 +194,12 @@ If(Bop(Eq, Var("x"), Num(0)),
    Num(1),
    Bop(Mult, Var("x"), App(Var("fat"), Bop(Diff, Var("x"), Num(1))))),
 App(Var("fat"), Num(5))) *)
+
+
+
+(*testes*)
+
+let sumPass = BinOp(Vnum(1), Sum, Vnum(1));;
+let result_eval_sum = eval sumPass environment
 
 (* #use "trab.ml";; *)
