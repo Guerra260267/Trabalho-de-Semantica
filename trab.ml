@@ -1,20 +1,20 @@
 (* Grammar:
 e ::= n
-| b
-| e1 op e2
-| if e1 then e2 else e3
-| x
-| e1 e2
-| fn x:T ⇒ e
-| let x:T = e1 in e2
-| let rec f:T1 → T2 = (fn y:T1 ⇒ e1) in e2
-| nil
-| e1 :: e2
-| isempty e
-| hd e
-| tl e
-| raise
-| try e1 with e2 
+  | b
+  | e1 op e2
+  | if e1 then e2 else e3
+  | x
+  | e1 e2
+  | fn x:T ⇒ e
+  | let x:T = e1 in e2
+  | let rec f:T1 → T2 = (fn y:T1 ⇒ e1) in e2
+  | nil
+  | e1 :: e2
+  | isempty e
+  | hd e
+  | tl e
+  | raise
+  | try e1 with e2 
 *)
 
 type variable = string ;;
@@ -71,16 +71,11 @@ type value = Vnum of int
            | Vrclos of variable * variable * expr * env (*AQUI: a meisma coisa*)
            | Vnil
            | Vcons of value * value
-           | Vraise
-           | VClosure of variable * expr * env
-           | VRecClosure of variable * variable * expr * env
-          
+           | Raise     
 and  
     env = (variable * value) list ;; 
 
-
-(* GERÊNCIA DE AMBIENTE *)
-(*-------------------------------------------------------------------------------*)
+(* -------------------------- GERÊNCIA DE AMBIENTE ------------------------------- *)
 
 (* Função auxiliar para remover tuplas de uma lista*)
 let remove_tuple var list =
@@ -100,7 +95,6 @@ let add_env_biding var v e : env = match e with
     if (List.exists (fun (k, _) -> k = var) e) 
     then List.append (remove_tuple var e) [(var,v)]
     else List.append e [(var,v)]
-  
 
 (* Função que retorna o valor de uma variável em um dado ambiente  *)
 let rec look_env_biding var e : value = match e with
@@ -108,11 +102,11 @@ let rec look_env_biding var e : value = match e with
   | (v, value)::tl ->
       if (v == var) then value else look_env_biding var tl
 
-(*-------------------------------------------------------------------------------*)
-
+(* ---------------------------------------------------------------------------- *)
 
 (* Temos que levar, sempre, em consideração o ambiente onde cada aplicação está 
 acontecendo e coletar as constraints*)
+
 (* --------------- Avaliador Big-Step de Programas L1 --------------- *)
 
 let rec eval (environment : env) (e : expr) : value = 
@@ -121,7 +115,7 @@ let rec eval (environment : env) (e : expr) : value =
   | Num(n) -> Vnum(n)
   | Bool(b) -> Vbool(b)
   
-  (*operações *)
+  (* operações *)
   | Bop (op,e1,e2) -> 
     let n1 = eval environment e1 in
     let n2 = eval environment e2 in
@@ -130,7 +124,7 @@ let rec eval (environment : env) (e : expr) : value =
       | Vnum(n1), Diff, Vnum(n2) -> Vnum(n1-n2)
       | Vnum(n1), Mult, Vnum(n2) -> Vnum(n1*n2)
       | Vnum(n1), Div, Vnum(n2) -> 
-          if n2 == 0 then Vraise else Vnum(n1/n2)
+          if n2 == 0 then Raise else Vnum(n1/n2)
       | Vnum(n1), Eq, Vnum(n2) -> Vbool(n1=n2)
       | Vnum(n1), Neq, Vnum(n2) -> Vbool(n1<>n2)
       | Vnum(n1), Less, Vnum(n2) -> Vbool(n1<n2)
@@ -140,32 +134,40 @@ let rec eval (environment : env) (e : expr) : value =
       | Vbool(n1), And, Vbool(n2) -> Vbool(n1&&n2)
       | Vbool(n1), Or, Vbool(n2) -> Vbool(n1||n2)
       | _ -> failwith "unimplemented")
-  (* ifs *)
+  
+  (* if *)
   | If (e1,e2,e3) ->
     let b1 = eval environment e1 in
     (match b1 with
       | Vbool(true) -> eval environment e2
       | Vbool(false) -> eval environment e3
-      | _ -> Vraise )
+      | _ -> Raise )
+ 
   (* variáveis  *)
   | Var(variable) ->
     look_env_biding variable environment
-  (* aplicações *)
-  | App (e1,e2) -> 
-    let v1 = eval environment e1 in 
-    let v2 = eval environment e2 in
-    (match v1,v2 with
-      (*atualiza o ambiente para adicionar a amarração*)
-      | VClosure(var, e, envi), v -> eval (add_env_biding var v envi) e
-      | VRecClosure(f, x, e, envi), v -> 
-          eval (add_env_biding f (VRecClosure (f, x, e, envi)) (add_env_biding x v envi)) e
-      | _ -> failwith "unimplemented")
+ 
+  (* aplicação *)
+  | App(e1,e2) -> 
+  let v1 = eval environment e1 in 
+  let v2 = eval environment e2 in
+  (match v1,v2 with
+    (*atualiza o ambiente para adicionar a amarração*)
+    | Vclos(var, e, envi), v -> eval (add_env_biding var v envi) e
+    | Vrclos(f, x, e, envi), v -> 
+        eval (add_env_biding f (Vrclos(f, x, e, envi)) (add_env_biding x v envi)) e
+    | _ -> failwith "unimplemented")
+ 
+  (* fn *)
+
   (* let *)
   | Let(var,e1,e2) ->
     let v1 = eval environment e1 in
     (
       eval (add_env_biding var v1 environment) e2
     )
+
+  (* let implícito*)
 
   (* letrec *)
   (* | Lrec (f, e1, e2) ->
@@ -175,12 +177,68 @@ let rec eval (environment : env) (e : expr) : value =
         |  VClosure(x,e,envi) -> eval (add_env_biding f (VRecClosure (f,x,e,environment)) envi) e2
         | _ -> failwith "unimplemented"
     )  *)
+
+  (* let rec implícito *)
+
+  (* nil *)
+  | Nil -> Vnil
+
+  (* cons*)
+  | Cons(e1, e2) -> (
+    let v1 = eval environment e1 in 
+    let v2 = eval environment e2 in 
+    (match v1, v2 with
+      | (Raise,_) -> Raise
+      | (_, Raise) -> Raise
+      | _ -> Vcons(v1, v2)
+    ) 
+   )
+
+  (* is empty *)
+  | IsEmpty(e) ->
+    let v = eval environment e in 
+    (match v with 
+      |Vnil -> (Vbool true)
+      |Vcons (v1, v2) -> (Vbool false)
+      |Raise -> Raise
+      | _ -> Raise 
+    )
+
+  (* head *)
+  | Hd(e) -> 
+    let v = eval environment e in
+    (match v with
+      | Vcons(v1,v2) -> v1
+      | Vnil -> Raise
+      | Raise -> Raise
+      | _ -> Raise
+    )
+  
+  (* tail *)
+  | Tl(e) ->  
+    let v = eval environment e in 
+    (match v with
+      | Vcons(v1,v2) -> v2
+      | Vnil -> Raise
+      | Raise -> Raise
+      | _ -> Raise
+    )
+
+  (* raise *)
+  | Raise -> Raise
+
+  (* try with *)
+  | TryWith(e1, e2) ->
+    let v = eval environment e1 in 
+    (match v with
+      |Raise -> eval environment e2
+      | _ -> v
+    )
+
+
   | _ -> failwith "unimplemented"
 
 ;;
-  
-
-
 
 (* ----------- Algoritmo de Inferência de Tipos para L1  ------------ *)
 (* collectTyEqs *)
@@ -196,7 +254,7 @@ let rec eval (environment : env) (e : expr) : value =
 
 
 
-
+(* ------------------------- Testes -------------------------- *)
 
 (* Segue um exemplo de como o programa L1 abaixo pode ser representado internamente *)
 
@@ -210,19 +268,12 @@ Lrec("fat", TyInt, TyInt, "x", TyInt,
 If(Bop(Eq, Var("x"), Num(0)),
    Num(1),
    Bop(Mult, Var("x"), App(Var("fat"), Bop(Diff, Var("x"), Num(1))))),
-App(Var("fat"), Num(5))) *)
-
-
-
-(*testes*)
-(* let sumPass = BinOp(Num(1), Sum, Num(1));;
-
-eval environment sumPass ;; *)
-
+App(Var("fat"), Num(5))) 
+*)
 
 let environment = empty_env;;
 let a = Num(5) ;;
-
-
+let sumPass = Bop(Sum, Num(1), Num(1));;
+(* eval environment sumPass;; *) 
 
 (* #use "trab.ml";; *)
